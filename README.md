@@ -41,24 +41,129 @@ compromise. Supports a defensible workflow aligned with **NIST SP 800-86** and
 
 ---
 
-## Quick start
+## How to Run
+
+### 1. Prerequisites
+- **Python 3.8+** installed and on your `PATH`
+  - Check: `python --version`
+- The toolkit uses only the Python **standard library** — no `pip install` needed.
+
+### 2. Clone the repository
+```bash
+git clone https://github.com/santhoshp0706-sudo/Digital-Forensics.git
+cd Digital-Forensics
+```
+
+### 3. Verify the toolkit works
+```bash
+python scripts/forensics_toolkit.py --help
+```
+You should see the available commands:
+```
+usage: forensics_toolkit.py [-h] {collect,image,tsk,memory,chain} ...
+
+Digital Forensics Toolkit
+
+positional arguments:
+  {collect,image,tsk,memory,chain}
+    collect             Collect an artifact with chain of custody
+    image               Show disk imaging command (dd)
+    tsk                 Show Sleuth Kit commands for an image
+    memory              Show Volatility commands for a memory image
+    chain               Print chain-of-custody log
+```
+
+---
+
+## Commands
+
+### `collect` — collect an artifact with chain of custody
+Hashes the file (SHA-256), records who/when it was acquired, and writes an
+evidence report to `evidence/<EVID-ID>_report.json`.
 
 ```bash
-# Collect an artifact with a chain-of-custody entry
+# Linux / macOS
 python scripts/forensics_toolkit.py collect --path /tmp/malware.bin --handler "A. Analyst"
 
-# Show the dd imaging command for a disk
+# Windows
+python scripts\forensics_toolkit.py collect --path C:\temp\malware.bin --handler "A. Analyst"
+```
+Output:
+```
+[chain-of-custody] 2026-08-18T13:53:35+00:00 | EVID-809341D5 | acquired | A. Analyst
+[collect] evidence EVID-809341D5 -> evidence\EVID-809341D5_report.json
+```
+
+### `image` — show the disk imaging (`dd`) command
+Prints the exact `dd` command to create a raw bit-stream image. Run it yourself
+as root/sudo.
+
+```bash
 python scripts/forensics_toolkit.py image --source /dev/sda --dest /evidence/disk1.raw
+```
+Output:
+```
+sudo dd if=/dev/sda of=/evidence/disk1.raw bs=4M conv=noerror,sync status=progress
+```
 
-# Show Sleuth Kit analysis commands for a disk image
+### `tsk` — show Sleuth Kit analysis commands
+Prints the The Sleuth Kit (TSK) commands to run against your disk image.
+
+```bash
 python scripts/forensics_toolkit.py tsk --image /evidence/disk1.raw
+```
+Output:
+```
+fls -r -p /evidence/disk1.raw
+fsstat /evidence/disk1.raw
+mmls /evidence/disk1.raw
+istat /evidence/disk1.raw <inode>
+icat /evidence/disk1.raw <inode>
+```
 
-# Show Volatility memory-analysis commands for a memory image
+### `memory` — show Volatility analysis commands
+Prints Volatility 3 plugin commands for a memory dump (`mem.raw` / `.vmem`).
+
+```bash
 python scripts/forensics_toolkit.py memory --file /evidence/mem.raw
+```
+Output:
+```
+vol3 -f /evidence/mem.raw windows.pslist
+vol3 -f /evidence/mem.raw windows.cmdline
+vol3 -f /evidence/mem.raw windows.netscan
+vol3 -f /evidence/mem.raw windows.malfind
+```
 
-# Print the chain-of-custody log
+### `chain` — print the chain-of-custody log
+Shows the full custody log recorded in `evidence/chain_of_custody.json`.
+
+```bash
 python scripts/forensics_toolkit.py chain
 ```
+
+---
+
+## Example: end-to-end workflow
+
+```bash
+# 1. Acquire: image the disk
+python scripts/forensics_toolkit.py image --source /dev/sda --dest disk1.raw
+sudo dd if=/dev/sda of=disk1.raw bs=4M conv=noerror,sync status=progress
+
+# 2. Preserve: log custody + hash a suspicious artifact
+python scripts/forensics_toolkit.py collect --path /tmp/suspicious.bin --handler "A. Analyst"
+
+# 3. Analyze: disk (TSK) and memory (Volatility)
+python scripts/forensics_toolkit.py tsk --image disk1.raw
+python scripts/forensics_toolkit.py memory --file mem.raw
+
+# 4. Report: review evidence and custody log
+python scripts/forensics_toolkit.py chain
+cat evidence/EVID-*/_report.json
+```
+
+---
 
 ## Tool reference
 
